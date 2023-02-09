@@ -9,23 +9,27 @@ module PegasusCore(
 	reg         wer;        //write enable register
 	wire [31:0] regdata_R, regdata_I;
 	wire [31:0] regdata_L, instr_val;
-   wire [3:0]  we_S;
-   wire [31:0] instruc;   // instruction from instruction memory
-   reg  [31:0] daddr;  // address to data memory
-   wire [31:0] drdata;  // data read from data memory reg [31:0] dwdata, // data to be written to data memory reg [4:0] rd,rs1,rs2, reg signed [31:0] imm,
+	wire [3:0]  we_S;
+	wire [31:0] instruc;   // instruction from instruction memory
+	reg  [31:0] daddr;  // address to data memory
+	wire [31:0] drdata;  // data read from data memory reg [31:0] dwdata, // data to be written to data memory reg [4:0] rd,rs1,rs2, reg signed [31:0] imm,
 	wire [31:0] rv1, rv2;
 	reg  [31:0] regdata;
 	reg  [31:0] dwdata; // data to be written to data memory
 	reg  [4:0]  rd,rs1,rs2;
 	reg signed [31:0] imm;
-	wire zero_flag;
+	reg zero_flag;
+	wire [3:0] alu_control;
+
+	wire [31:0] in_a, in_b;
+	reg  [31:0] alu_out;
 	
 
     always@(posedge clk)
     begin
         if(reset)       //set the program counter to be zero
             instr = 0;
-				zero_flag = 0;
+			zero_flag = 0;
         else
             instr = pc;
     end 
@@ -41,7 +45,7 @@ module PegasusCore(
 		//checking the opcode for type of instruction
         case(instruc[6:0])
 		  
-				//R type instructions
+			//R type instructions
             7'b0110011:      
             begin
                 rd = instruc[11:7];    //write register
@@ -50,30 +54,29 @@ module PegasusCore(
                 wer = 1;               //write enabled to regiters
 				we = 4'b0;
                 alu_control = {instruc[30],instruc[14:12]}; // alu control sognals
-                regdata = regdata_R;   //data to be written to registers
-					 
-				alu ins1(.in_a(rv1), .in_b(rv2), .control(alu_control), .alu_out(regdata_R), .zero(zero_flag));
+                in_a = rv1;
+				in_b = rv2;
+				regdata = alu_out; //data to be written to registers
 				pc = instr+4;
+
             end
 				
-				//I type instructions
+			//I type instructions
             7'b0010011:     
             begin
                 rd = instruc[11:7];
                 rs1 = instruc[19:15]; 
                 imm = {{20{instruc[31]}},instruc[31:20]};//sign extending immediate to 32bits   
                 wer=1;
-					 we = 4'b0;
-					 
-                alu_control= {1'b0,instruc[14:12]};
-					 
+				we = 4'b0;
+				alu_control= {1'b0,instruc[14:12]};
 				if ((alu_control == 4'b0101) and (instruc[30] == 1'b1)) //for srai instruction
 					alu_control = 4'b1101;
-							
-                regdata = regdata_I;
-					 
-				alu ins2(.in_a(rv1), .in_b(imm), .control(alu_control), .alu_out(regdata_I), .zero(zero_flag));
-					pc = instr+4;
+					
+				in_a = rv1;
+				in_b = imm;			
+                regdata = alu_out;
+				pc = instr+4;
             end
 				
 			
@@ -112,15 +115,17 @@ module PegasusCore(
                 we = we_S;
 					 pc = instr+4;
             end
+				
 				7'b1100011:		//B type instructions
 				begin
 					rs1 = instruc[19:15];
 					rs2 = instruc[24:20];
-					imm = {{20{instruc[31]}},instruc[31],instruc[7],instruc[30:25],instruc[11:8],1'b0};
+					imm = {{19{instruc[31]}},instruc[31],instruc[7],instruc[30:25],instruc[11:8],1'b0};
 					wer=0;
 					we=4'b0;
 					pc = instr_val;
 				end
+				
 				7'b1100111:		//JALR instruction
 				begin
 					rs1 = instruc[19:15];
@@ -166,6 +171,13 @@ module PegasusCore(
 	 
 	 
     //Instantiating modules from the computational block
+	alu ins1(.in_a(in_a), .in_b(in_b), .control(alu_control), .alu_out(alu_out), .zero(zero_flag));
+	 
+	 
+	 
+	 
+	 
+	 
 //    R_type r1(idata,rv1,rv2,regdata_R);
 //    I_type i1(idata,rv1,imm,regdata_I);
 //    L_type l1(idata, daddr, drdata, regdata_L);
