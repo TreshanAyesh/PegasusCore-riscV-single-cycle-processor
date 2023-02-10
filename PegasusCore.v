@@ -89,11 +89,10 @@ module PegasusCore(
                 imm = {{20{instruc[31]}},instruc[31:20]};
                 wer=1;
                 we=4'b0;
-
-				//daddr = rv1+imm;       //memory address
-				alu ins3(.in_a(rv1), .in_b(imm), .control(4'b0000), .alu_out(daddr), .zero(zero_flag)); //adding rv1 and imm to get the effective address
-				Loads l1(instruc, drdata, regdata_L);
-                
+				alu_control = 4'b0000;
+				in_a = rv1;
+				in_b = imm;
+				daddr = alu_out;       //memory address
                 regdata = regdata_L;   //data to be written to rd
 				pc = instr+4;
             end
@@ -106,63 +105,67 @@ module PegasusCore(
                 rs2 = instruc[24:20];
                 imm = {{20{instruc[31]}},instruc[31:25],instruc[11:7]};
                 wer=0;
-                daddr = rv1+imm;
-					 case(instruc[14:12])
-					 3'b000: dwdata = {rv2[7:0],rv2[7:0],rv2[7:0],rv2[7:0]};
-					 3'b001: dwdata = {rv2[15:0],rv2[15:0]};
-					 3'b010: dwdata = rv2;
-					 endcase
-                we = we_S;
-					 pc = instr+4;
+				alu_control = 4'b0000;
+				in_a = rv1;
+				in_b = imm;
+                daddr = alu_out;   //adding imm and base register 
+
+				case(instruc[14:12])
+				3'b000: dwdata = {rv2[7:0],rv2[7:0],rv2[7:0],rv2[7:0]}; //sb
+				3'b001: dwdata = {rv2[15:0],rv2[15:0]};                 //sh
+				3'b010: dwdata = rv2;                                   //sw
+				endcase
+				we = we_S;
+				pc = instr+4;
             end
 				
-				7'b1100011:		//B type instructions
-				begin
-					rs1 = instruc[19:15];
-					rs2 = instruc[24:20];
-					imm = {{19{instruc[31]}},instruc[31],instruc[7],instruc[30:25],instruc[11:8],1'b0};
-					wer=0;
-					we=4'b0;
-					pc = instr_val;
-				end
-				
-				7'b1100111:		//JALR instruction
-				begin
-					rs1 = instruc[19:15];
-					rd = instruc[11:7];
-					imm = {{20{instruc[31]}},instruc[31:20]};
-					wer = 1;
-					we = 4'b0;
-					regdata = instr+4;
-					pc = (rv1+imm)&32'hfffffffe;
-				end
-				7'b1101111:		//JAL instruction
-				begin
-					rd = instruc[11:7];
-					imm = {{11{instruc[31]}},instruc[31],instruc[19:12],instruc[20],instruc[30:21],1'b0};
-					pc = (instr+imm);
-					wer = 1;
-					we = 4'b0;
-					regdata = instr+4;
-				end
-				7'b0010111:		//AUIPC
-				begin
-					rd = instruc[11:7];
-					imm = {instruc[31:12],12'b0};
-					wer = 1;
-					we = 4'b0;
-					regdata = instr+imm;
-					pc = instr+4;
-				end
-				7'b0110111:		//LUI
-				begin
-					rd = instruc[11:7];
-					imm = {instruc[31:12],12'b0};
-					wer=1;
-					we=4'b0;
-					regdata = imm;
-					pc = instr+4;
-				end
+			7'b1100011:		//B type instructions
+			begin
+				rs1 = instruc[19:15];
+				rs2 = instruc[24:20];
+				imm = {{19{instruc[31]}},instruc[31],instruc[7],instruc[30:25],instruc[11:8],1'b0};
+				wer=0;
+				we=4'b0;
+				pc = instr_val;
+			end
+			
+			7'b1100111:		//JALR instruction
+			begin
+				rs1 = instruc[19:15];
+				rd = instruc[11:7];
+				imm = {{20{instruc[31]}},instruc[31:20]};
+				wer = 1;
+				we = 4'b0;
+				regdata = instr+4;
+				pc = (rv1+imm)&32'hfffffffe;
+			end
+			7'b1101111:		//JAL instruction
+			begin
+				rd = instruc[11:7];
+				imm = {{11{instruc[31]}},instruc[31],instruc[19:12],instruc[20],instruc[30:21],1'b0};
+				pc = (instr+imm);
+				wer = 1;
+				we = 4'b0;
+				regdata = instr+4;
+			end
+			7'b0010111:		//AUIPC
+			begin
+				rd = instruc[11:7];
+				imm = {instruc[31:12],12'b0};
+				wer = 1;
+				we = 4'b0;
+				regdata = instr+imm;
+				pc = instr+4;
+			end
+			7'b0110111:		//LUI
+			begin
+				rd = instruc[11:7];
+				imm = {instruc[31:12],12'b0};
+				wer=1;
+				we=4'b0;
+				regdata = imm;
+				pc = instr+4;
+			end
 			endcase
     end
 
@@ -172,7 +175,7 @@ module PegasusCore(
 	 
     //Instantiating modules from the computational block
 	alu ins1(.in_a(in_a), .in_b(in_b), .control(alu_control), .alu_out(alu_out), .zero(zero_flag));
-	 
+	Loads l1(.instr(instruc),.drdata(drdata), .out(regdata_L)); 
 	 
 	 
 	 
